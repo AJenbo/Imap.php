@@ -26,7 +26,6 @@ class IMAP
 {
     //TODO Process all responces from _responce
     //TODO Handle process each line as it is fetched instead of expecting specefic responces
-    //TODO finish remaning TODO's in the code
 
     public $capabilities = array();
     public $error = '';  // error string
@@ -322,7 +321,6 @@ class IMAP
     /**
      * The list_mailbox command gets the specified list of mailbox
      *
-     * $ref__selected $wild_card    Interpretation
      * Reference     Mailbox Name  Interpretation
      * ------------  ------------  --------------
      * ~smith/Mail/  foo.*         ~smith/Mail/foo.*
@@ -331,21 +329,23 @@ class IMAP
      * ~smith/Mail/  /usr/doc/foo  /usr/doc/foo
      * archive/      ~fred/Mail/*  ~fred/Mail/*
      *
-     * @param string $ref_mailbox TODO
-     * @param string $wild_card   TODO
-     * @param bool   $lsub        Weather to list subscribed mailboxes
+     * @param string $mailbox Reference mailbox
+     * @param string $search  Search string
+     * @param bool   $lsub    Weather to list subscribed mailboxes
      *
-     * @return array TODO
+     * @return array Array of mailboxes contaning array of attributes,
+     *               delimiter charecter and name
      */
-    public function listMailboxes($ref_mailbox = '', $wild_card = '*', $lsub = false)
+    public function listMailboxes($mailbox = '', $search = '*', $lsub = false)
     {
         $type = 'LIST';
         if ($lsub) {
             $type = 'LSUB';
         }
 
-        //TODO encode utf7-imap
-        $this->_writeLine($type . ' "' . $ref_mailbox . '" "' . $wild_card . '"');
+        $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
+        $search = mb_convert_encoding($search, 'UTF7-IMAP', 'UTF-8');
+        $this->_writeLine($type . ' "' . $mailbox . '" "' . $search . '"');
 
         $responce = $this->_responce();
 
@@ -381,7 +381,7 @@ class IMAP
     }
 
     /**
-     * This function create a mail box
+     * Create a mailbox
      *
      * @param string $mailbox Name of mailbox to create
      *
@@ -395,7 +395,7 @@ class IMAP
     }
 
     /**
-     * This function rename exists mail box
+     * Rename an exists mailbox
      *
      * @param string $mailbox    Name of mailbox to rename
      * @param string $mailboxNew New name for mailbox
@@ -411,7 +411,7 @@ class IMAP
     }
 
     /**
-     * This function delete exists mail box
+     * Delete mailbox
      *
      * @param string $mailbox Name of mailbox to delete
      *
@@ -471,12 +471,12 @@ class IMAP
     }
 
     /**
-     * This functiuon is to open the mailbox
+     * Open a mailbox
      *
      * @param string $mailbox  Name of mailbox to be selected
      * @param bool   $readOnly Weather to open it in read only mode
      *
-     * @return array TODO
+     * @return array Contaning array of flags, and other properties of the mailbox
      */
     public function select($mailbox = 'INBOX', $readOnly = false)
     {
@@ -729,41 +729,34 @@ class IMAP
      *
      * UNSEEN         Messages that do not have the \Seen flag set.
      *
-     *  Example:      search_mailbox('FLAGGED SINCE 1-Feb-1994 NOT FROM "Smith"')
+     * Example:      search('FLAGGED SINCE 1-Feb-1994 NOT FROM "Smith"')
      *
      * @param string $search_cri TODO
-     * @param string $charset    TODO
      * @param bool   $uid        Weather to use UID
      *
-     * @return array TODO
+     * @return mixed Array of matching id's or false
      */
-    public function search($search_cri, $charset = '', $uid = false)
+    public function search($search_cri, $uid = false)
     {
         if (!$this->_selected) {
             $this->error = 'Error : No mail box is selected.!<br>';
             return false;
         }
 
-        $command = 'SEARCH';
-        if ($charset) {
-            $command .= ' CHARSET "' . addslashes($charset) . '"';
-        }
-        $command .= ' ' . $search_cri;
+        $command = 'SEARCH CHARSET "UTF-8" ' . $search_cri;
         if ($uid) {
             $command = 'UID ' . $command;
         }
 
         $this->_writeLine($command);
-
-        $return = array();
         $responce = $this->_responce();
-        $temp_arr = explode("\r\n", $responce['data']);
-        foreach ($temp_arr as $line) {
-            if (substr($line, 0, 9) == '* SEARCH ') {
-                $return = array_merge($return, explode(' ', substr($line, 9)));
-            }
+
+        preg_match('/[*] SEARCH ([\s0-9]+)/', $responce['data'], $match);
+        if ($match) {
+            return explode(' ', $match[1]);
+        } else {
+            return false;
         }
-        return $return;
     }
 
     /**
@@ -817,7 +810,7 @@ class IMAP
      *
      * Example : fetch('2:4', '(FLAGS BODY[HEADER.FIELDS (DATE FROM)]')
      *
-     * @param string $msg_set       TODO
+     * @param string $msg_set       Message(s) to fetch
      * @param string $msg_data_name TODO
      * @param bool   $uid           Weather to use UID
      *
@@ -862,7 +855,7 @@ class IMAP
      * -FLAGS.SILENT Equivalent to -FLAGS, but without returning a new
      *               value.
      *
-     * @param string $msg_set       TODO
+     * @param string $msg_set       Message(s) to fetch
      * @param string $msg_data_name TODO
      * @param string $value         TODO
      * @param bool   $uid           Weather to use UID
@@ -888,7 +881,7 @@ class IMAP
     /**
      * The copy the specified message(s) to a specified mailbox
      *
-     * @param string $msg_set TODO
+     * @param string $msg_set Message(s) to fetch
      * @param string $mailbox Name of mailbox to copy messages to
      * @param bool   $uid     Weather to use UID
      *
