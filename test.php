@@ -1,5 +1,17 @@
 <?php
-require_once('imap.php');
+/**
+ * Test the IMAP class
+ *
+ * PHP version 5
+ *
+ * @category IMAP
+ * @package  IMAP
+ * @author   Anders Jenbo <anders@jenbo.dk>
+ * @license  GPLv2 http://www.gnu.org/licenses/gpl-2.0.html
+ * @link     https://github.com/AJenbo/PHP-imap
+ */
+
+require_once 'imap.php';
 $imap = new IMAP(
     'username',
     'password',
