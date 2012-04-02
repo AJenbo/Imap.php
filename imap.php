@@ -733,7 +733,7 @@ class IMAP
         $this->_writeLine($command);
         $responce = $this->_responce();
 
-        preg_match('/[*] SEARCH ([\s0-9]+)/', $responce['data'], $match);
+        preg_match('/[*] SEARCH ([ 0-9]+)/', $responce['data'], $match);
         if ($match) {
             return explode(' ', $match[1]);
         } else {
