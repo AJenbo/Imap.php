@@ -1,42 +1,25 @@
-<?php
+<?php namespace AJenbo;
+
 /**
- * Declare the IMAP class
- *
- * PHP version 5
- *
- * @category IMAP
- * @package  IMAP
- * @author   Anders Jenbo <anders@jenbo.dk>
  * @license  GPLv2 http://www.gnu.org/licenses/gpl-2.0.html
  * @link     https://github.com/AJenbo/PHP-imap
  */
 
-/**
- * Access IMAP mailboxes without PHP IMAP extension
- *
- * PHP version 5
- *
- * @category IMAP
- * @package  IMAP
- * @author   Anders Jenbo <anders@jenbo.dk>
- * @license  GPLv2 http://www.gnu.org/licenses/gpl-2.0.html
- * @link     https://github.com/AJenbo/PHP-imap
- */
-class IMAP
+class Imap
 {
     //TODO Process all responces from _responce
     //TODO Handle process each line as it is fetched instead of expecting specefic responces
     //TODO show error for * NO Invalid message sequence number: 1
 
-    public $capabilities = array();
+    public $capabilities = [];
 
-    private $_host = '';
-    private $_port = 143;
-    private $_user = '';
-    private $_password = '';
-    private $_socket = null;
-    private $_tag = 0;
-    private $_selected = false;
+    private $host = '';
+    private $port = 143;
+    private $user = '';
+    private $password = '';
+    private $socket = null;
+    private $tag = 0;
+    private $selected = false;
 
     /**
      * Set up vars and initiate call _connect()
@@ -46,46 +29,46 @@ class IMAP
      * @param string $host     Server to connect to.
      * @param int    $port     Default is 143.
      */
-    function __construct($user, $password, $host, $port = 143)
+    public function __construct($user, $password, $host, $port = 143)
     {
-        $this->_host = $host;
-        $this->_port = $port;
-        $this->_user = $user;
-        $this->_password = $password;
+        $this->host = $host;
+        $this->port = $port;
+        $this->user = $user;
+        $this->password = $password;
 
-        $this->_connect();
+        $this->connect();
     }
 
     /**
      * Close the connection
      */
-    function __destruct()
+    public function __destruct()
     {
-        $this->_writeLine('LOGOUT');
-        @fclose($this->_socket);
+        $this->writeLine('LOGOUT');
+        @fclose($this->socket);
     }
 
     /**
-     * Open a connection to the server and authenticate 
+     * Open a connection to the server and authenticate
      *
      * @return null
      */
-    private function _connect()
+    private function connect()
     {
-        $this->_socket = stream_socket_client(
-            $this->_host . ':' . $this->_port,
+        $this->socket = stream_socket_client(
+            $this->host . ':' . $this->port,
             $errno,
             $errstr,
             30
         );
-        if (!$this->_socket) {
+        if (!$this->socket) {
             throw new Exception("$errstr ($errno)");
         }
-        stream_set_blocking($this->_socket, 1);
+        stream_set_blocking($this->socket, 1);
 
-        $this->_responce();
-        $this->_capability();
-        $this->_authenticate();
+        $this->responce();
+        $this->capability();
+        $this->authenticate();
     }
 
     /**
@@ -96,14 +79,14 @@ class IMAP
      *
      * @return null
      */
-    private function _writeLine($command, $literal = false)
+    private function writeLine($command, $literal = false)
     {
         if (!$literal) {
-            $this->_tag++;
-            $command = $this->_tag . ' ' . $command;
+            $this->tag++;
+            $command = $this->tag . ' ' . $command;
         }
 
-        if (!@fputs($this->_socket, $command . "\r\n")) {
+        if (!@fputs($this->socket, $command . "\r\n")) {
             $error = error_get_last();
             throw new Exception($error['message']);
         }
@@ -116,13 +99,13 @@ class IMAP
      *
      * @return array Responce from server devided in to types
      */
-    private function _responce($literal = false)
+    private function responce($literal = false)
     {
         $responce = '';
         $return = array('message' => '', 'responce' => '', 'data' => '');
         while (true) {
-            $line = fgets($this->_socket);
-            $stream = stream_get_meta_data($this->_socket);
+            $line = fgets($this->socket);
+            $stream = stream_get_meta_data($this->socket);
             if (!$stream['unread_bytes']) {
                 if (($literal && preg_match('/^[+] /', $line))
                     || preg_match('/^[0-9*]+ OK/', $line)
@@ -164,11 +147,11 @@ class IMAP
      *
      * @return null
      */
-    private function _capability($string = '')
+    private function capability($string = '')
     {
         if (!$string) {
-            $this->_writeLine('CAPABILITY');
-            $responce = $this->_responce();
+            $this->writeLine('CAPABILITY');
+            $responce = $this->responce();
             $string = substr($responce['data'], 13);
         }
 
@@ -195,17 +178,17 @@ class IMAP
      *
      * @return null
      */
-    private function _authenticate()
+    private function authenticate()
     {
         $authenticated = false;
         if (!$authenticated) {
-            $authenticated = $this->_authenticatePlain();
+            $authenticated = $this->authenticatePlain();
         }
         if (!$authenticated) {
-            $authenticated = $this->_authenticateLogin();
+            $authenticated = $this->authenticateLogin();
         }
         if (!$authenticated) {
-            $this->_login();
+            $this->login();
         }
     }
 
@@ -214,30 +197,30 @@ class IMAP
      *
      * @return bool True if authenticated
      */
-    private function _authenticatePlain()
+    private function authenticatePlain()
     {
         if (!@$this->capabilities['AUTH']['PLAIN']) {
             return false;
         }
 
-        $auth = base64_encode(chr(0) . $this->_user . chr(0) . $this->_password);
+        $auth = base64_encode(chr(0) . $this->user . chr(0) . $this->password);
         $command = 'AUTHENTICATE PLAIN';
 
         if (@$this->capabilities['SASL-IR']) {
-            $this->_writeLine($command . ' ' . $auth);
+            $this->writeLine($command . ' ' . $auth);
         } else {
             if (@$this->capabilities['LITERAL+']) {
-                $this->_writeLine($command . ' {' . strlen($auth) . '+}');
+                $this->writeLine($command . ' {' . strlen($auth) . '+}');
             } else {
-                $this->_writeLine($command);
-                $this->_responce(true);
+                $this->writeLine($command);
+                $this->responce(true);
             }
-            $this->_writeLine($auth, true);
+            $this->writeLine($auth, true);
         }
 
         try {
-            $responce = $this->_responce();
-            $this->_capability(substr($responce['responce'], 11));
+            $responce = $this->responce();
+            $this->capability(substr($responce['responce'], 11));
             return true;
         } catch (Exception $e) {
         }
@@ -250,42 +233,42 @@ class IMAP
      *
      * @return bool True if authenticated
      */
-    private function _authenticateLogin()
+    private function authenticateLogin()
     {
         //TODO onc.com supports this with out saying so, should we always try it?
         if (!@$this->capabilities['AUTH']['LOGIN']) {
             return false;
         }
 
-        $username = base64_encode($this->_user);
-        $password = base64_encode($this->_password);
+        $username = base64_encode($this->user);
+        $password = base64_encode($this->password);
         $command = 'AUTHENTICATE LOGIN';
 
         if (@$this->capabilities['SASL-IR']) {
             $command = $command . ' ' . $username;
             //TODO one.com failes with this login methode and LITERAL+
             if (@$this->capabilities['LITERAL+']) {
-                $this->_writeLine($command . ' {' . strlen($password) . '+}');
+                $this->writeLine($command . ' {' . strlen($password) . '+}');
             } else {
-                $this->_writeLine($command);
-                $this->_responce(true);
+                $this->writeLine($command);
+                $this->responce(true);
             }
         } else {
             if (@$this->capabilities['LITERAL+']) {
-                $this->_writeLine($command . ' {' . strlen($username) . '+}');
-                $this->_writeLine($username . ' {' . strlen($password) . '+}', true);
+                $this->writeLine($command . ' {' . strlen($username) . '+}');
+                $this->writeLine($username . ' {' . strlen($password) . '+}', true);
             } else {
-                $this->_writeLine($command);
-                $this->_responce(true);
-                $this->_writeLine($username, true);
-                $this->_responce(true);
+                $this->writeLine($command);
+                $this->responce(true);
+                $this->writeLine($username, true);
+                $this->responce(true);
             }
         }
-        $this->_writeLine($password, true);
+        $this->writeLine($password, true);
 
         try {
-            $responce = $this->_responce();
-            $this->_capability(substr($responce['responce'], 11));
+            $responce = $this->responce();
+            $this->capability(substr($responce['responce'], 11));
             return true;
         } catch (Exception $e) {
         }
@@ -298,13 +281,13 @@ class IMAP
      *
      * @return null
      */
-    private function _login()
+    private function login()
     {
-        $command = 'LOGIN ' . $this->_user . ' ' . $this->_password;
-        $this->_writeLine($command);
+        $command = 'LOGIN ' . $this->user . ' ' . $this->password;
+        $this->writeLine($command);
 
-        $responce = $this->_responce();
-        $this->_capability(substr($responce['responce'], 11));
+        $responce = $this->responce();
+        $this->capability(substr($responce['responce'], 11));
     }
 
     /**
@@ -315,8 +298,8 @@ class IMAP
      */
     public function noop()
     {
-        $this->_writeLine('NOOP');
-        $this->_responce();
+        $this->writeLine('NOOP');
+        $this->responce();
     }
 
     /**
@@ -337,9 +320,9 @@ class IMAP
             $command = 'SELECT "' . $mailbox . '"';
         }
 
-        $this->_writeLine($command);
-        $responce = $this->_responce();
-        $this->_selected = true;
+        $this->writeLine($command);
+        $responce = $this->responce();
+        $this->selected = true;
 
         $return = array();
 
@@ -436,8 +419,8 @@ class IMAP
     public function create($mailbox)
     {
         $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
-        $this->_writeLine('CREATE "' . $mailbox . '"');
-        $this->_responce();
+        $this->writeLine('CREATE "' . $mailbox . '"');
+        $this->responce();
     }
 
     /**
@@ -449,13 +432,13 @@ class IMAP
      */
     public function delete($mailbox)
     {
-        if ($this->_selected) {
+        if ($this->selected) {
             throw new Exception('Close mailbox first');
         }
 
         $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
-        $this->_writeLine('DELETE "' . $mailbox . '"');
-        $this->_responce();
+        $this->writeLine('DELETE "' . $mailbox . '"');
+        $this->responce();
     }
 
     /**
@@ -468,14 +451,14 @@ class IMAP
      */
     public function rename($mailbox, $mailboxNew)
     {
-        if ($this->_selected) {
+        if ($this->selected) {
             throw new Exception('Close mailbox first');
         }
 
         $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
         $mailboxNew = mb_convert_encoding($mailboxNew, 'UTF7-IMAP', 'UTF-8');
-        $this->_writeLine('RENAME "' . $mailbox . '" "' . $mailboxNew . '"');
-        $this->_responce();
+        $this->writeLine('RENAME "' . $mailbox . '" "' . $mailboxNew . '"');
+        $this->responce();
     }
 
     /**
@@ -488,8 +471,8 @@ class IMAP
     public function subscribe($mailbox)
     {
         $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
-        $this->_writeLine('SUBSCRIBE "' . $mailbox . '"');
-        $this->_responce();
+        $this->writeLine('SUBSCRIBE "' . $mailbox . '"');
+        $this->responce();
     }
 
     /**
@@ -502,8 +485,8 @@ class IMAP
     public function unsubscribe($mailbox)
     {
         $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
-        $this->_writeLine('UNSUBSCRIBE "' . $mailbox .'"');
-        $this->_responce();
+        $this->writeLine('UNSUBSCRIBE "' . $mailbox .'"');
+        $this->responce();
     }
 
     /**
@@ -525,9 +508,9 @@ class IMAP
 
         $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
         $search = mb_convert_encoding($search, 'UTF7-IMAP', 'UTF-8');
-        $this->_writeLine($type . ' "' . $mailbox . '" "' . $search . '"');
+        $this->writeLine($type . ' "' . $mailbox . '" "' . $search . '"');
 
-        $responce = $this->_responce();
+        $responce = $this->responce();
 
         preg_match_all(
             '/[*] ' . $type . ' \(([^)]*)\) "([^"]+)" "([^"]+)"/',
@@ -571,8 +554,8 @@ class IMAP
     public function status($mailbox, $item)
     {
         $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
-        $this->_writeLine('STATUS "' . $mailbox . '" (' . $item . ')');
-        $responce = $this->_responce();
+        $this->writeLine('STATUS "' . $mailbox . '" (' . $item . ')');
+        $responce = $this->responce();
 
         $return = array();
 
@@ -639,14 +622,14 @@ class IMAP
         $command = 'APPEND "' . $mailbox . '" ($flags) {' . strlen($message);
 
         if (@$this->capabilities['LITERAL+']) {
-            $this->_writeLine($command . '+}');
+            $this->writeLine($command . '+}');
         } else {
-            $this->_writeLine($command . '}');
-            $this->_responce(true);
+            $this->writeLine($command . '}');
+            $this->responce(true);
         }
 
-        $this->_writeLine($message, true);
-        $responce = $this->_responce();
+        $this->writeLine($message, true);
+        $responce = $this->responce();
 
         preg_match('/APPENDUID [0-9]+ ([0-9]+)/', $responce['responce'], $match);
         if ($match) {
@@ -663,12 +646,12 @@ class IMAP
      */
     public function check()
     {
-        if (!$this->_selected) {
+        if (!$this->selected) {
             throw new Exception('Open mailbox first');
         }
 
-        $this->_writeLine('CHECK');
-        $this->_responce();
+        $this->writeLine('CHECK');
+        $this->responce();
     }
 
     /**
@@ -678,14 +661,14 @@ class IMAP
      */
     public function close()
     {
-        if (!$this->_selected) {
+        if (!$this->selected) {
             throw new Exception('Open mailbox first');
         }
 
-        $this->_writeLine('CLOSE');
-        $responce = $this->_responce();
+        $this->writeLine('CLOSE');
+        $responce = $this->responce();
 
-        $this->_selected = false;
+        $this->selected = false;
     }
 
     /**
@@ -695,12 +678,12 @@ class IMAP
      */
     public function expunge()
     {
-        if (!$this->_selected) {
+        if (!$this->selected) {
             throw new Exception('Open mailbox first');
         }
 
-        $this->_writeLine('EXPUNGE');
-        $responce = $this->_responce();
+        $this->writeLine('EXPUNGE');
+        $responce = $this->responce();
 
         preg_match_all(
             '/[*] ([0-9]+) EXPUNGE/',
@@ -721,7 +704,7 @@ class IMAP
      */
     public function search($criteria, $uid = false)
     {
-        if (!$this->_selected) {
+        if (!$this->selected) {
             throw new Exception('Open mailbox first');
         }
 
@@ -730,8 +713,8 @@ class IMAP
             $command = 'UID ' . $command;
         }
 
-        $this->_writeLine($command);
-        $responce = $this->_responce();
+        $this->writeLine($command);
+        $responce = $this->responce();
 
         preg_match('/[*] SEARCH ([ 0-9]+)/', $responce['data'], $match);
         if ($match) {
@@ -752,7 +735,7 @@ class IMAP
      */
     public function fetch($msg_set, $data, $uid = false)
     {
-        if (!$this->_selected) {
+        if (!$this->selected) {
             throw new Exception('Open mailbox first');
         }
 
@@ -761,8 +744,8 @@ class IMAP
             $command = 'UID ' . $command;
         }
 
-        $this->_writeLine($command);
-        return $this->_responce();
+        $this->writeLine($command);
+        return $this->responce();
     }
 
     /**
@@ -778,7 +761,7 @@ class IMAP
      */
     public function store($msg_set, $action, $flags, $uid = false)
     {
-        if (!$this->_selected) {
+        if (!$this->selected) {
             throw new Exception('Open mailbox first');
         }
 
@@ -787,8 +770,8 @@ class IMAP
             $command = 'UID ' . $command;
         }
 
-        $this->_writeLine($command);
-        $responce = $this->_responce();
+        $this->writeLine($command);
+        $responce = $this->responce();
 
         preg_match_all(
             '/[*] ([0-9]+) FETCH \(FLAGS \(([^(]*)\)\)/',
@@ -823,7 +806,7 @@ class IMAP
      */
     public function copy($msg_set, $mailbox, $uid = false)
     {
-        if (!$this->_selected) {
+        if (!$this->selected) {
             throw new Exception('Open mailbox first');
         }
 
@@ -833,8 +816,7 @@ class IMAP
             $command = 'UID ' . $command;
         }
 
-        $this->_writeLine($command);
-        $this->_responce();
+        $this->writeLine($command);
+        $this->responce();
     }
 }
-

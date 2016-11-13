@@ -1,22 +1,10 @@
 <?php
-/**
- * Test the IMAP class
- *
- * PHP version 5
- *
- * @category IMAP
- * @package  IMAP
- * @author   Anders Jenbo <anders@jenbo.dk>
- * @license  GPLv2 http://www.gnu.org/licenses/gpl-2.0.html
- * @link     https://github.com/AJenbo/PHP-imap
- */
-
-require_once 'imap.php';
-$imap = new IMAP(
+require_once 'Imap.php';
+$imap = new AJenbo\Imap(
     'username',
     'password',
     'localhost',
-    "143"
+    143
 );
 
 $imap->noop();
@@ -54,4 +42,3 @@ $imap->check();
 $response = $imap->close();
 $imap->rename('INBOX.test', 'INBOX.test2');
 $imap->delete('INBOX.test2');
-
