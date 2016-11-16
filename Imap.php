@@ -159,6 +159,7 @@ class Imap
 
         $string = explode(' ', $string);
         foreach ($string as $capability) {
+            $capability = trim($capability);
             if (strpos($capability, '=') === false) {
                 if (!@$this->capabilities[$capability]) {
                     $this->capabilities[$capability] = true;
