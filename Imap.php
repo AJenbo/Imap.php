@@ -106,35 +106,32 @@ class Imap
         while (true) {
             $line = fgets($this->socket);
             $stream = stream_get_meta_data($this->socket);
-            if (!$stream['unread_bytes']) {
-                if (($literal && preg_match('/^[+] /', $line))
-                    || preg_match('/^[0-9*]+ OK/', $line)
-                    || preg_match('/^[0-9*]+ NO/', $line)
-                    || preg_match('/^[0-9*]+ BAD/', $line)
-                ) {
-                    break;
-                }
+            if (!$stream['unread_bytes']
+                && (($literal && preg_match('/^\+ /u', $line))
+                || preg_match('/^[0-9*]+ (?:OK|NO|BAD)/u', $line))
+            ) {
+                break;
             }
             $responce .= $line;
         }
 
-        $return['data'] = $responce;
-
         if ($literal) {
-            if (!preg_match('/^[+] /', $line)) {
+            if (!preg_match('/^[+] /u', $line)) {
                 throw new Exception($line);
             }
             return true;
-        } else {
-            if (!preg_match('/^[0-9*]+ OK/', $line)) {
-                throw new Exception($line);
-            }
-            if (preg_match('/^[0-9*]+ OK \[([^\]]+)\] (.*)$/', $line, $matches)) {
-                $return['responce'] = $matches[1];
-                $return['message'] = $matches[2];
-            } elseif (preg_match('/^[0-9*]+ OK (.*)$/', $line, $matches)) {
-                $return['message'] = $matches[1];
-            }
+        }
+
+        $return['data'] = $responce;
+
+        if (!preg_match('/^[0-9*]+ OK/u', $line)) {
+            throw new Exception($line);
+        }
+        if (preg_match('/^[0-9*]+ OK \[([^\]]+)\] (.*)$/u', $line, $matches)) {
+            $return['responce'] = $matches[1];
+            $return['message'] = $matches[2];
+        } elseif (preg_match('/^[0-9*]+ OK (.*)$/u', $line, $matches)) {
+            $return['message'] = $matches[1];
         }
 
         return $return;
@@ -328,7 +325,7 @@ class Imap
         $return = array();
 
         preg_match(
-            '/[*] FLAGS \(([^(]+)\)/',
+            '/^\* FLAGS \(([^(]+)\)/u',
             $responce['data'],
             $matches
         );
@@ -341,7 +338,7 @@ class Imap
         }
 
         preg_match(
-            '/[*] OK \[PERMANENTFLAGS \(([^(]+)\)\]/',
+            '/^\* OK \[PERMANENTFLAGS \(([^(]+)\)\]/u',
             $responce['data'],
             $matches
         );
@@ -353,58 +350,24 @@ class Imap
             $return['permanentflags'] = $permanentflags;
         }
 
-        preg_match(
-            '/[*] ([0-9]+) EXISTS/',
+        preg_match_all(
+            '/^\* ([0-9]+) (EXISTS|RECENT)/mu',
             $responce['data'],
-            $matches
+            $matches,
+            PREG_SET_ORDER
         );
-        if ($matches) {
-            $return['exists'] = $matches[1];
+        foreach ($matches as $matche) {
+            $return[mb_strtolower($matche[2])] = (int) $matches[1];
         }
 
-        preg_match(
-            '/[*] ([0-9]+) RECENT/',
+        preg_match_all(
+            '/^\* OK \\[(UNSEEN|UIDVALIDITY|UIDNEXT|HIGHESTMODSEQ) ([0-9]+)\\]/mu',
             $responce['data'],
-            $matches
+            $matches,
+            PREG_SET_ORDER
         );
-        if ($matches) {
-            $return['recent'] = $matches[1];
-        }
-
-        preg_match(
-            '/[*] OK \[UNSEEN ([0-9]+)\]/',
-            $responce['data'],
-            $matches
-        );
-        if ($matches) {
-            $return['unseen'] = $matches[1];
-        }
-
-        preg_match(
-            '/[*] OK \[UIDVALIDITY ([0-9]+)\]/',
-            $responce['data'],
-            $matches
-        );
-        if ($matches) {
-            $return['uidvalidity'] = $matches[1];
-        }
-
-        preg_match(
-            '/[*] OK \[UIDNEXT ([0-9]+)\]/',
-            $responce['data'],
-            $matches
-        );
-        if ($matches) {
-            $return['uidnext'] = $matches[1];
-        }
-
-        preg_match(
-            '/[*] OK \[HIGHESTMODSEQ ([0-9]+)\]/',
-            $responce['data'],
-            $matches
-        );
-        if ($matches) {
-            $return['highestmodseq'] = $matches[1];
+        foreach ($matches as $matche) {
+            $return[mb_strtolower($matche[1])] = (int) $matches[2];
         }
 
         return $return;
@@ -514,7 +477,7 @@ class Imap
         $responce = $this->responce();
 
         preg_match_all(
-            '/[*] ' . $type . ' \(([^)]*)\) "([^"]+)" "([^"]+)"/',
+            '/^\* ' . $type . ' \(([^)]*)\) "([^"]+)" "([^"]+)"/mu',
             $responce['data'],
             $matches,
             PREG_SET_ORDER
@@ -560,49 +523,14 @@ class Imap
 
         $return = array();
 
-        preg_match(
-            '/[*] STATUS "[^"]+" \(MESSAGES ([0-9]+)\)/',
+        preg_match_all(
+            '/^\* STATUS "[^"]+" \((MESSAGES|RECENT|UIDNEXT|UIDVALIDITY|UNSEEN) ([0-9]+)\)/mu',
             $responce['data'],
-            $matches
+            $matches,
+            PREG_SET_ORDER
         );
-        if ($matches) {
-            $return['messages'] = $matches[1];
-        }
-
-        preg_match(
-            '/[*] STATUS "[^"]+" \(RECENT ([0-9]+)\)/',
-            $responce['data'],
-            $matches
-        );
-        if ($matches) {
-            $return['recent'] = $matches[1];
-        }
-
-        preg_match(
-            '/[*] STATUS "[^"]+" \(UIDNEXT ([0-9]+)\)/',
-            $responce['data'],
-            $matches
-        );
-        if ($matches) {
-            $return['uidnext'] = $matches[1];
-        }
-
-        preg_match(
-            '/[*] STATUS "[^"]+" \(UIDVALIDITY ([0-9]+)\)/',
-            $responce['data'],
-            $matches
-        );
-        if ($matches) {
-            $return['uidvalidity'] = $matches[1];
-        }
-
-        preg_match(
-            '/[*] STATUS "[^"]+" \(UNSEEN ([0-9]+)\)/',
-            $responce['data'],
-            $matches
-        );
-        if ($matches) {
-            $return['unseen'] = $matches[1];
+        foreach ($matches as $matche) {
+            $return[mb_strtolower($matche[1])] = (int) $matches[2];
         }
 
         return $return;
@@ -632,7 +560,7 @@ class Imap
         $this->writeLine($message, true);
         $responce = $this->responce();
 
-        preg_match('/APPENDUID [0-9]+ ([0-9]+)/', $responce['responce'], $match);
+        preg_match('/APPENDUID [0-9]+ ([0-9]+)/u', $responce['responce'], $match);
         if ($match) {
             return $match[1];
         } else {
@@ -687,7 +615,7 @@ class Imap
         $responce = $this->responce();
 
         preg_match_all(
-            '/[*] ([0-9]+) EXPUNGE/',
+            '/^\* ([0-9]+) EXPUNGE/mu',
             $responce['data'],
             $matches
         );
@@ -717,7 +645,7 @@ class Imap
         $this->writeLine($command);
         $responce = $this->responce();
 
-        preg_match('/[*] SEARCH ([ 0-9]+)/', $responce['data'], $match);
+        preg_match('^\* SEARCH ([ 0-9]+)/u', $responce['data'], $match);
         if ($match) {
             return explode(' ', $match[1]);
         } else {
@@ -775,7 +703,7 @@ class Imap
         $responce = $this->responce();
 
         preg_match_all(
-            '/[*] ([0-9]+) FETCH \(FLAGS \(([^(]*)\)\)/',
+            '/^\* ([0-9]+) FETCH \(FLAGS \(([^(]*)\)\)/mu',
             $responce['data'],
             $matches,
             PREG_SET_ORDER
