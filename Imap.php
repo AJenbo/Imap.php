@@ -7,7 +7,7 @@
 
 class Imap
 {
-    //TODO Process all responces from _responce
+    //TODO Process all responces from responce
     //TODO Handle process each line as it is fetched instead of expecting specefic responces
     //TODO show error for * NO Invalid message sequence number: 1
 
@@ -22,7 +22,7 @@ class Imap
     private $selected = false;
 
     /**
-     * Set up vars and initiate call _connect()
+     * Set up vars and initiate call connect()
      *
      * @param string $user     A valid username.
      * @param string $password A valid password.
@@ -138,7 +138,7 @@ class Imap
     }
 
     /**
-     * Populate the _capabilites variable with the serveres reported capabilitys
+     * Populate the capabilites variable with the serveres reported capabilitys
      *
      * @param string $string String to use instead of fetching from the server
      *
@@ -660,7 +660,7 @@ class Imap
      * @param string $data    Atom or a parenthesized (see rfc3501 6.4.5)
      * @param bool   $uid     Weather to use UID
      *
-     * @return array Raw from _responce()
+     * @return array Raw from responce()
      */
     public function fetch($msg_set, $data, $uid = false)
     {
@@ -731,7 +731,7 @@ class Imap
      * @param string $mailbox Name of mailbox to copy messages to
      * @param bool   $uid     Weather to use UID
      *
-     * @return array Raw from _responce()
+     * @return array Raw from responce()
      */
     public function copy($msg_set, $mailbox, $uid = false)
     {
