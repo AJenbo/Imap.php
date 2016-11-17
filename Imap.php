@@ -563,9 +563,9 @@ class Imap
         preg_match('/APPENDUID [0-9]+ ([0-9]+)/u', $responce['responce'], $match);
         if ($match) {
             return $match[1];
-        } else {
-            return true;
         }
+
+        return true;
     }
 
     /**
@@ -648,9 +648,9 @@ class Imap
         preg_match('^\* SEARCH ([ 0-9]+)/u', $responce['data'], $match);
         if ($match) {
             return explode(' ', $match[1]);
-        } else {
-            return false;
         }
+
+        return false;
     }
 
     /**
