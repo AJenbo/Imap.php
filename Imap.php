@@ -62,7 +62,7 @@ class Imap
             30
         );
         if (!$this->socket) {
-            throw new Exception("$errstr ($errno)");
+            throw new Exception($errstr . ' (' . $errno . ')');
         }
         stream_set_blocking($this->socket, 1);
 
@@ -620,7 +620,7 @@ class Imap
     public function append($mailbox, $message, $flags = '')
     {
         $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
-        $command = 'APPEND "' . $mailbox . '" ($flags) {' . strlen($message);
+        $command = 'APPEND "' . $mailbox . '" (' . $flags . ') {' . strlen($message);
 
         if (@$this->capabilities['LITERAL+']) {
             $this->writeLine($command . '+}');
@@ -740,7 +740,7 @@ class Imap
             throw new Exception('Open mailbox first');
         }
 
-        $command = "FETCH $msg_set $data";
+        $command = 'FETCH ' . $msg_set . ' ' . $data;
         if ($uid) {
             $command = 'UID ' . $command;
         }
@@ -766,7 +766,7 @@ class Imap
             throw new Exception('Open mailbox first');
         }
 
-        $command = "STORE $msg_set $action ($flags)";
+        $command = 'STORE ' . $msg_set . ' ' . $action . ' (' . $flags . ')';
         if ($uid) {
             $command = 'UID ' . $command;
         }
