@@ -667,7 +667,7 @@ class Imap
         }
 
         $this->writeLine('CLOSE');
-        $responce = $this->responce();
+        $this->responce();
 
         $this->selected = false;
     }
