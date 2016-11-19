@@ -1,5 +1,7 @@
 <?php namespace AJenbo;
 
+use \Exception;
+
 /**
  * @license  GPLv2 http://www.gnu.org/licenses/gpl-2.0.html
  * @link     https://github.com/AJenbo/PHP-imap
