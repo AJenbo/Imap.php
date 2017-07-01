@@ -1,48 +1,48 @@
 <?php namespace AJenbo;
 
-use \Exception;
+use Exception;
 
 /**
  * @license  GPLv2 http://www.gnu.org/licenses/gpl-2.0.html
- * @link     https://github.com/AJenbo/PHP-imap
+ *
+ * @see     https://github.com/AJenbo/PHP-imap
  */
-
 class Imap
 {
     //TODO Process all responces from responce
     //TODO Handle process each line as it is fetched instead of expecting specefic responces
     //TODO show error for * NO Invalid message sequence number: 1
 
-    public $capabilities = [];
+    public $capabilities = array();
 
-    private $host = '';
-    private $port = 143;
-    private $user = '';
+    private $host     = '';
+    private $port     = 143;
+    private $user     = '';
     private $password = '';
-    private $socket = null;
-    private $tag = 0;
+    private $socket   = null;
+    private $tag      = 0;
     private $selected = false;
 
     /**
-     * Set up vars and initiate call connect()
+     * Set up vars and initiate call connect().
      *
-     * @param string $user     A valid username.
-     * @param string $password A valid password.
-     * @param string $host     Server to connect to.
-     * @param int    $port     Default is 143.
+     * @param string $user     a valid username
+     * @param string $password a valid password
+     * @param string $host     server to connect to
+     * @param int    $port     default is 143
      */
     public function __construct($user, $password, $host, $port = 143)
     {
-        $this->host = $host;
-        $this->port = $port;
-        $this->user = $user;
+        $this->host     = $host;
+        $this->port     = $port;
+        $this->user     = $user;
         $this->password = $password;
 
         $this->connect();
     }
 
     /**
-     * Close the connection
+     * Close the connection.
      */
     public function __destruct()
     {
@@ -51,7 +51,7 @@ class Imap
     }
 
     /**
-     * Open a connection to the server and authenticate
+     * Open a connection to the server and authenticate.
      *
      * @return null
      */
@@ -74,7 +74,7 @@ class Imap
     }
 
     /**
-     * Send a command to the server
+     * Send a command to the server.
      *
      * @param string $command The command to send over the wire
      * @param bool   $literal Weather this is a literal write
@@ -84,18 +84,18 @@ class Imap
     private function writeLine($command, $literal = false)
     {
         if (!$literal) {
-            $this->tag++;
+            ++$this->tag;
             $command = $this->tag . ' ' . $command;
         }
 
-        if (!@fputs($this->socket, $command . "\r\n")) {
+        if (!@fwrite($this->socket, $command."\r\n")) {
             $error = error_get_last();
             throw new Exception($error['message']);
         }
     }
 
     /**
-     * Retrive the full responce message from server
+     * Retrive the full responce message from server.
      *
      * @param bool $literal Weather to expect a ready for literal message
      *
@@ -104,9 +104,9 @@ class Imap
     private function responce($literal = false)
     {
         $responce = '';
-        $return = array('message' => '', 'responce' => '', 'data' => '');
+        $return   = array('message' => '', 'responce' => '', 'data' => '');
         while (true) {
-            $line = fgets($this->socket);
+            $line   = fgets($this->socket);
             $stream = stream_get_meta_data($this->socket);
             if (!$stream['unread_bytes']
                 && (($literal && preg_match('/^\+ /u', $line))
@@ -121,6 +121,7 @@ class Imap
             if (!preg_match('/^[+] /u', $line)) {
                 throw new Exception($line);
             }
+
             return true;
         }
 
@@ -131,7 +132,7 @@ class Imap
         }
         if (preg_match('/^[0-9*]+ OK \[([^\]]+)\] (.*)$/u', $line, $matches)) {
             $return['responce'] = $matches[1];
-            $return['message'] = $matches[2];
+            $return['message']  = $matches[2];
         } elseif (preg_match('/^[0-9*]+ OK (.*)$/u', $line, $matches)) {
             $return['message'] = $matches[1];
         }
@@ -140,7 +141,7 @@ class Imap
     }
 
     /**
-     * Populate the capabilites variable with the serveres reported capabilitys
+     * Populate the capabilites variable with the serveres reported capabilitys.
      *
      * @param string $string String to use instead of fetching from the server
      *
@@ -151,7 +152,7 @@ class Imap
         if (!$string) {
             $this->writeLine('CAPABILITY');
             $responce = $this->responce();
-            $string = substr($responce['data'], 13);
+            $string   = substr($responce['data'], 13);
         }
 
         $this->capabilities = array();
@@ -174,7 +175,7 @@ class Imap
     }
 
     /**
-     * Use most secure way to login to server
+     * Use most secure way to login to server.
      *
      * @return null
      */
@@ -193,7 +194,7 @@ class Imap
     }
 
     /**
-     * The plain authentification methode
+     * The plain authentification methode.
      *
      * @return bool True if authenticated
      */
@@ -203,7 +204,7 @@ class Imap
             return false;
         }
 
-        $auth = base64_encode(chr(0) . $this->user . chr(0) . $this->password);
+        $auth    = base64_encode(chr(0) . $this->user . chr(0) . $this->password);
         $command = 'AUTHENTICATE PLAIN';
 
         if (@$this->capabilities['SASL-IR']) {
@@ -221,6 +222,7 @@ class Imap
         try {
             $responce = $this->responce();
             $this->capability(substr($responce['responce'], 11));
+
             return true;
         } catch (Exception $e) {
         }
@@ -229,7 +231,7 @@ class Imap
     }
 
     /**
-     * The login authentification methode
+     * The login authentification methode.
      *
      * @return bool True if authenticated
      */
@@ -242,7 +244,7 @@ class Imap
 
         $username = base64_encode($this->user);
         $password = base64_encode($this->password);
-        $command = 'AUTHENTICATE LOGIN';
+        $command  = 'AUTHENTICATE LOGIN';
 
         if (@$this->capabilities['SASL-IR']) {
             $command = $command . ' ' . $username;
@@ -269,6 +271,7 @@ class Imap
         try {
             $responce = $this->responce();
             $this->capability(substr($responce['responce'], 11));
+
             return true;
         } catch (Exception $e) {
         }
@@ -277,7 +280,7 @@ class Imap
     }
 
     /**
-     * The most basic authentification methode
+     * The most basic authentification methode.
      *
      * @return null
      */
@@ -303,7 +306,7 @@ class Imap
     }
 
     /**
-     * Open a mailbox
+     * Open a mailbox.
      *
      * @param string $mailbox  Name of mailbox to be selected
      * @param bool   $readOnly Weather to open it in read only mode
@@ -314,14 +317,13 @@ class Imap
     {
         $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
 
-        if ($readOnly) {
-            $command = 'EXAMINE "' . $mailbox . '"';
-        } else {
+        $command = 'EXAMINE "' . $mailbox . '"';
+        if (!$readOnly) {
             $command = 'SELECT "' . $mailbox . '"';
         }
 
         $this->writeLine($command);
-        $responce = $this->responce();
+        $responce       = $this->responce();
         $this->selected = true;
 
         $return = array();
@@ -376,7 +378,7 @@ class Imap
     }
 
     /**
-     * Create a mailbox
+     * Create a mailbox.
      *
      * @param string $mailbox Name of mailbox to create
      *
@@ -390,7 +392,7 @@ class Imap
     }
 
     /**
-     * Delete mailbox
+     * Delete mailbox.
      *
      * @param string $mailbox Name of mailbox to delete
      *
@@ -408,7 +410,7 @@ class Imap
     }
 
     /**
-     * Rename an exists mailbox
+     * Rename an exists mailbox.
      *
      * @param string $mailbox    Name of mailbox to rename
      * @param string $mailboxNew New name for mailbox
@@ -421,14 +423,14 @@ class Imap
             throw new Exception('Close mailbox first');
         }
 
-        $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
+        $mailbox    = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
         $mailboxNew = mb_convert_encoding($mailboxNew, 'UTF7-IMAP', 'UTF-8');
         $this->writeLine('RENAME "' . $mailbox . '" "' . $mailboxNew . '"');
         $this->responce();
     }
 
     /**
-     * Subscribe to a mailbox
+     * Subscribe to a mailbox.
      *
      * @param string $mailbox Name of mailbox to subscribe to
      *
@@ -442,7 +444,7 @@ class Imap
     }
 
     /**
-     * Unsubscribe from a mailbox
+     * Unsubscribe from a mailbox.
      *
      * @param string $mailbox Name of mailbox to unsubscribe from
      *
@@ -451,12 +453,12 @@ class Imap
     public function unsubscribe($mailbox)
     {
         $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
-        $this->writeLine('UNSUBSCRIBE "' . $mailbox .'"');
+        $this->writeLine('UNSUBSCRIBE "' . $mailbox . '"');
         $this->responce();
     }
 
     /**
-     * Query for existing mailboxes
+     * Query for existing mailboxes.
      *
      * @param string $mailbox Reference mailbox
      * @param string $search  Search string (see rfc3501 6.3.8)
@@ -473,7 +475,7 @@ class Imap
         }
 
         $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
-        $search = mb_convert_encoding($search, 'UTF7-IMAP', 'UTF-8');
+        $search  = mb_convert_encoding($search, 'UTF7-IMAP', 'UTF-8');
         $this->writeLine($type . ' "' . $mailbox . '" "' . $search . '"');
 
         $responce = $this->responce();
@@ -486,21 +488,21 @@ class Imap
         );
 
         $mailboxesSort = array();
-        $mailboxes = array();
+        $mailboxes     = array();
         foreach ($matches as $mailbox) {
             $attributes = array();
             foreach (explode(' ', $mailbox[1]) as $attribute) {
                 $attributes[$attribute] = true;
             }
             $delimiter = mb_convert_encoding($mailbox[2], 'UTF-8', 'UTF7-IMAP');
-            $name = mb_convert_encoding($mailbox[3], 'UTF-8', 'UTF7-IMAP');
+            $name      = mb_convert_encoding($mailbox[3], 'UTF-8', 'UTF7-IMAP');
 
             $mailboxesSort[] = $name;
 
             $mailboxes[] = array(
                 'attributes' => $attributes,
-                'delimiter' => $delimiter,
-                'name' => $name
+                'delimiter'  => $delimiter,
+                'name'       => $name,
             );
         }
 
@@ -510,7 +512,7 @@ class Imap
     }
 
     /**
-     * Get mailbox status
+     * Get mailbox status.
      *
      * @param string $mailbox Name of mailbox to get status from
      * @param string $item    The type of status (see rfc3501 6.3.10)
@@ -539,7 +541,7 @@ class Imap
     }
 
     /**
-     * Save an email in a specified mailbox
+     * Save an email in a specified mailbox.
      *
      * @param string $mailbox Name of mailbox to append messages to
      * @param string $message Full message header and body
@@ -571,7 +573,7 @@ class Imap
     }
 
     /**
-     * Run housekeeping on the current mailbox
+     * Run housekeeping on the current mailbox.
      *
      * @return null
      */
@@ -586,7 +588,7 @@ class Imap
     }
 
     /**
-     * Delete messages flaged with \Deleted and close mailbox
+     * Delete messages flaged with \Deleted and close mailbox.
      *
      * @return null
      */
@@ -603,7 +605,7 @@ class Imap
     }
 
     /**
-     * Delete messages flaged with \Deleted
+     * Delete messages flaged with \Deleted.
      *
      * @return array Message numbers that where deleted
      */
@@ -658,45 +660,46 @@ class Imap
     /**
      * Retrieves data associated with messages in the mailbox.
      *
-     * @param string $msg_set Message(s) to fetch
-     * @param string $data    Atom or a parenthesized (see rfc3501 6.4.5)
-     * @param bool   $uid     Weather to use UID
+     * @param string $msgSet Message(s) to fetch
+     * @param string $data   Atom or a parenthesized (see rfc3501 6.4.5)
+     * @param bool   $uid    Weather to use UID
      *
      * @return array Raw from responce()
      */
-    public function fetch($msg_set, $data, $uid = false)
+    public function fetch($msgSet, $data, $uid = false)
     {
         if (!$this->selected) {
             throw new Exception('Open mailbox first');
         }
 
-        $command = 'FETCH ' . $msg_set . ' ' . $data;
+        $command = 'FETCH ' . $msgSet . ' ' . $data;
         if ($uid) {
             $command = 'UID ' . $command;
         }
 
         $this->writeLine($command);
+
         return $this->responce();
     }
 
     /**
-     * Update message flags
+     * Update message flags.
      *
-     * @param string $msg_set Message(s) to fetch
-     * @param string $action  How to preforme the change (see rfc3501 6.4.6)
-     * @param string $flags   Flags seporated by space
-     * @param bool   $uid     Weather to use UID
+     * @param string $msgSet Message(s) to fetch
+     * @param string $action How to preforme the change (see rfc3501 6.4.6)
+     * @param string $flags  Flags seporated by space
+     * @param bool   $uid    Weather to use UID
      *
      * @return array Key is message id with the message flags as a sub array under
-     * the flags key
+     *               the flags key
      */
-    public function store($msg_set, $action, $flags, $uid = false)
+    public function store($msgSet, $action, $flags, $uid = false)
     {
         if (!$this->selected) {
             throw new Exception('Open mailbox first');
         }
 
-        $command = 'STORE ' . $msg_set . ' ' . $action . ' (' . $flags . ')';
+        $command = 'STORE ' . $msgSet . ' ' . $action . ' (' . $flags . ')';
         if ($uid) {
             $command = 'UID ' . $command;
         }
@@ -719,7 +722,7 @@ class Imap
             }
 
             $fetchs[$fetch[1]] = array(
-                'flags' => $flags
+                'flags' => $flags,
             );
         }
 
@@ -727,22 +730,22 @@ class Imap
     }
 
     /**
-     * The copy the specified message(s) to a specified mailbox
+     * The copy the specified message(s) to a specified mailbox.
      *
-     * @param string $msg_set Message(s) to fetch
+     * @param string $msgSet  Message(s) to fetch
      * @param string $mailbox Name of mailbox to copy messages to
      * @param bool   $uid     Weather to use UID
      *
      * @return array Raw from responce()
      */
-    public function copy($msg_set, $mailbox, $uid = false)
+    public function copy($msgSet, $mailbox, $uid = false)
     {
         if (!$this->selected) {
             throw new Exception('Open mailbox first');
         }
 
         $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
-        $command = 'COPY ' . $msg_set . ' "' . $mailbox . '"';
+        $command = 'COPY ' . $msgSet . ' "' . $mailbox . '"';
         if ($uid) {
             $command = 'UID ' . $command;
         }
