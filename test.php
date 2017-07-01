@@ -1,4 +1,5 @@
 <?php
+
 require_once 'Imap.php';
 $imap = new AJenbo\Imap(
     'username',
