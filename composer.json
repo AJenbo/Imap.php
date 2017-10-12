@@ -1,7 +1,6 @@
 {
-    "name": "ajenbo/imap",
+    "name": "ajenbo/imap.php",
     "description": "IMAP over socket",
-    "version": "0.1.0",
     "require": {
         "php": ">=7.1"
     },
