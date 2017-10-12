@@ -1,11 +1,9 @@
 <?php namespace AJenbo;
 
-use Exception;
+use AJenbo\Imap\Exception;
 
 /**
  * @license  GPLv2 http://www.gnu.org/licenses/gpl-2.0.html
- *
- * @see     https://github.com/AJenbo/PHP-imap
  */
 class Imap
 {
@@ -13,13 +11,13 @@ class Imap
     //TODO Handle process each line as it is fetched instead of expecting specefic responces
     //TODO show error for * NO Invalid message sequence number: 1
 
-    public $capabilities = array();
+    public $capabilities = [];
 
+    private $socket;
     private $host     = '';
     private $port     = 143;
     private $user     = '';
     private $password = '';
-    private $socket   = null;
     private $tag      = 0;
     private $selected = false;
 
@@ -31,7 +29,7 @@ class Imap
      * @param string $host     server to connect to
      * @param int    $port     default is 143
      */
-    public function __construct($user, $password, $host, $port = 143)
+    public function __construct(string $user, string $password, string $host, int $port = 143)
     {
         $this->host     = $host;
         $this->port     = $port;
@@ -52,10 +50,8 @@ class Imap
 
     /**
      * Open a connection to the server and authenticate.
-     *
-     * @return null
      */
-    private function connect()
+    private function connect(): void
     {
         $this->socket = stream_socket_client(
             $this->host . ':' . $this->port,
@@ -66,7 +62,7 @@ class Imap
         if (!$this->socket) {
             throw new Exception($errstr . ' (' . $errno . ')');
         }
-        stream_set_blocking($this->socket, 1);
+        stream_set_blocking($this->socket, true);
 
         $this->responce();
         $this->capability();
@@ -78,19 +74,17 @@ class Imap
      *
      * @param string $command The command to send over the wire
      * @param bool   $literal Weather this is a literal write
-     *
-     * @return null
      */
-    private function writeLine($command, $literal = false)
+    private function writeLine(string $command, bool $literal = false): void
     {
         if (!$literal) {
             ++$this->tag;
             $command = $this->tag . ' ' . $command;
         }
 
-        if (!@fwrite($this->socket, $command."\r\n")) {
+        if (!@fwrite($this->socket, $command . "\r\n")) {
             $error = error_get_last();
-            throw new Exception($error['message']);
+            throw new Exception($error['message'] ?? 'Unknown');
         }
     }
 
@@ -99,14 +93,14 @@ class Imap
      *
      * @param bool $literal Weather to expect a ready for literal message
      *
-     * @return array Responce from server devided in to types
+     * @return string[] Responce from server devided in to types
      */
-    private function responce($literal = false)
+    private function responce($literal = false): array
     {
         $responce = '';
-        $return   = array('message' => '', 'responce' => '', 'data' => '');
+        $return = ['message' => '', 'responce' => '', 'data' => ''];
         while (true) {
-            $line   = fgets($this->socket);
+            $line = fgets($this->socket);
             $stream = stream_get_meta_data($this->socket);
             if (!$stream['unread_bytes']
                 && (($literal && preg_match('/^\+ /u', $line))
@@ -122,7 +116,7 @@ class Imap
                 throw new Exception($line);
             }
 
-            return true;
+            return [];
         }
 
         $return['data'] = $responce;
@@ -132,7 +126,7 @@ class Imap
         }
         if (preg_match('/^[0-9*]+ OK \[([^\]]+)\] (.*)$/u', $line, $matches)) {
             $return['responce'] = $matches[1];
-            $return['message']  = $matches[2];
+            $return['message'] = $matches[2];
         } elseif (preg_match('/^[0-9*]+ OK (.*)$/u', $line, $matches)) {
             $return['message'] = $matches[1];
         }
@@ -144,30 +138,28 @@ class Imap
      * Populate the capabilites variable with the serveres reported capabilitys.
      *
      * @param string $string String to use instead of fetching from the server
-     *
-     * @return null
      */
-    private function capability($string = '')
+    private function capability(string $string = ''): void
     {
         if (!$string) {
             $this->writeLine('CAPABILITY');
             $responce = $this->responce();
-            $string   = substr($responce['data'], 13);
+            $string = substr($responce['data'], 13);
         }
 
-        $this->capabilities = array();
+        $this->capabilities = [];
 
         $string = explode(' ', $string);
         foreach ($string as $capability) {
             $capability = trim($capability);
-            if (strpos($capability, '=') === false) {
+            if (false === strpos($capability, '=')) {
                 if (!@$this->capabilities[$capability]) {
                     $this->capabilities[$capability] = true;
                 }
             } else {
                 $capability = explode('=', $capability);
-                if (@$this->capabilities[$capability[0]] === true) {
-                    $this->capabilities[$capability[0]] = array();
+                if (true === @$this->capabilities[$capability[0]]) {
+                    $this->capabilities[$capability[0]] = [];
                 }
                 $this->capabilities[$capability[0]][$capability[1]] = true;
             }
@@ -176,10 +168,8 @@ class Imap
 
     /**
      * Use most secure way to login to server.
-     *
-     * @return null
      */
-    private function authenticate()
+    private function authenticate(): void
     {
         $authenticated = false;
         if (!$authenticated) {
@@ -198,13 +188,13 @@ class Imap
      *
      * @return bool True if authenticated
      */
-    private function authenticatePlain()
+    private function authenticatePlain(): bool
     {
         if (!@$this->capabilities['AUTH']['PLAIN']) {
             return false;
         }
 
-        $auth    = base64_encode(chr(0) . $this->user . chr(0) . $this->password);
+        $auth = base64_encode(chr(0) . $this->user . chr(0) . $this->password);
         $command = 'AUTHENTICATE PLAIN';
 
         if (@$this->capabilities['SASL-IR']) {
@@ -235,7 +225,7 @@ class Imap
      *
      * @return bool True if authenticated
      */
-    private function authenticateLogin()
+    private function authenticateLogin(): bool
     {
         //TODO onc.com supports this with out saying so, should we always try it?
         if (!@$this->capabilities['AUTH']['LOGIN']) {
@@ -244,7 +234,7 @@ class Imap
 
         $username = base64_encode($this->user);
         $password = base64_encode($this->password);
-        $command  = 'AUTHENTICATE LOGIN';
+        $command = 'AUTHENTICATE LOGIN';
 
         if (@$this->capabilities['SASL-IR']) {
             $command = $command . ' ' . $username;
@@ -281,10 +271,8 @@ class Imap
 
     /**
      * The most basic authentification methode.
-     *
-     * @return null
      */
-    private function login()
+    private function login(): void
     {
         $command = 'LOGIN ' . $this->user . ' ' . $this->password;
         $this->writeLine($command);
@@ -296,10 +284,8 @@ class Imap
     /**
      * Keep connection alive during a period of inactivity
      * TODO get posible responce since last check.
-     *
-     * @return null
      */
-    public function noop()
+    public function noop(): void
     {
         $this->writeLine('NOOP');
         $this->responce();
@@ -313,7 +299,7 @@ class Imap
      *
      * @return array Contaning array of flags, and other properties of the mailbox
      */
-    public function select($mailbox = 'INBOX', $readOnly = false)
+    public function select(string $mailbox = 'INBOX', bool $readOnly = false): array
     {
         $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
 
@@ -323,10 +309,10 @@ class Imap
         }
 
         $this->writeLine($command);
-        $responce       = $this->responce();
+        $responce = $this->responce();
         $this->selected = true;
 
-        $return = array();
+        $return = [];
 
         preg_match(
             '/^\* FLAGS \(([^(]+)\)/u',
@@ -334,7 +320,7 @@ class Imap
             $matches
         );
         if ($matches) {
-            $flags = array();
+            $flags = [];
             foreach (explode(' ', $matches[1]) as $flag) {
                 $flags[$flag] = true;
             }
@@ -347,7 +333,7 @@ class Imap
             $matches
         );
         if ($matches) {
-            $permanentflags = array();
+            $permanentflags = [];
             foreach (explode(' ', $matches[1]) as $flag) {
                 $permanentflags[$flag] = true;
             }
@@ -381,10 +367,8 @@ class Imap
      * Create a mailbox.
      *
      * @param string $mailbox Name of mailbox to create
-     *
-     * @return null
      */
-    public function create($mailbox)
+    public function create(string $mailbox): void
     {
         $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
         $this->writeLine('CREATE "' . $mailbox . '"');
@@ -395,10 +379,8 @@ class Imap
      * Delete mailbox.
      *
      * @param string $mailbox Name of mailbox to delete
-     *
-     * @return null
      */
-    public function delete($mailbox)
+    public function delete(string $mailbox): void
     {
         if ($this->selected) {
             throw new Exception('Close mailbox first');
@@ -414,16 +396,14 @@ class Imap
      *
      * @param string $mailbox    Name of mailbox to rename
      * @param string $mailboxNew New name for mailbox
-     *
-     * @return null
      */
-    public function rename($mailbox, $mailboxNew)
+    public function rename(string $mailbox, string $mailboxNew): void
     {
         if ($this->selected) {
             throw new Exception('Close mailbox first');
         }
 
-        $mailbox    = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
+        $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
         $mailboxNew = mb_convert_encoding($mailboxNew, 'UTF7-IMAP', 'UTF-8');
         $this->writeLine('RENAME "' . $mailbox . '" "' . $mailboxNew . '"');
         $this->responce();
@@ -433,10 +413,8 @@ class Imap
      * Subscribe to a mailbox.
      *
      * @param string $mailbox Name of mailbox to subscribe to
-     *
-     * @return null
      */
-    public function subscribe($mailbox)
+    public function subscribe(string $mailbox): void
     {
         $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
         $this->writeLine('SUBSCRIBE "' . $mailbox . '"');
@@ -447,10 +425,8 @@ class Imap
      * Unsubscribe from a mailbox.
      *
      * @param string $mailbox Name of mailbox to unsubscribe from
-     *
-     * @return null
      */
-    public function unsubscribe($mailbox)
+    public function unsubscribe(string $mailbox): void
     {
         $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
         $this->writeLine('UNSUBSCRIBE "' . $mailbox . '"');
@@ -464,10 +440,9 @@ class Imap
      * @param string $search  Search string (see rfc3501 6.3.8)
      * @param bool   $lsub    Weather to list subscribed mailboxes
      *
-     * @return array Array of mailboxes contaning array of attributes,
-     *               delimiter charecter and name
+     * @return array[] Array of mailboxes contaning array of attributes, delimiter charecter and name
      */
-    public function listMailboxes($mailbox = '', $search = '*', $lsub = false)
+    public function listMailboxes(string $mailbox = '', string $search = '*', bool $lsub = false): array
     {
         $type = 'LIST';
         if ($lsub) {
@@ -475,7 +450,7 @@ class Imap
         }
 
         $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
-        $search  = mb_convert_encoding($search, 'UTF7-IMAP', 'UTF-8');
+        $search = mb_convert_encoding($search, 'UTF7-IMAP', 'UTF-8');
         $this->writeLine($type . ' "' . $mailbox . '" "' . $search . '"');
 
         $responce = $this->responce();
@@ -487,23 +462,23 @@ class Imap
             PREG_SET_ORDER
         );
 
-        $mailboxesSort = array();
-        $mailboxes     = array();
+        $mailboxesSort = [];
+        $mailboxes = [];
         foreach ($matches as $mailbox) {
-            $attributes = array();
+            $attributes = [];
             foreach (explode(' ', $mailbox[1]) as $attribute) {
                 $attributes[$attribute] = true;
             }
             $delimiter = mb_convert_encoding($mailbox[2], 'UTF-8', 'UTF7-IMAP');
-            $name      = mb_convert_encoding($mailbox[3], 'UTF-8', 'UTF7-IMAP');
+            $name = mb_convert_encoding($mailbox[3], 'UTF-8', 'UTF7-IMAP');
 
             $mailboxesSort[] = $name;
 
-            $mailboxes[] = array(
+            $mailboxes[] = [
                 'attributes' => $attributes,
                 'delimiter'  => $delimiter,
                 'name'       => $name,
-            );
+            ];
         }
 
         array_multisort($mailboxesSort, SORT_LOCALE_STRING, $mailboxes);
@@ -517,15 +492,15 @@ class Imap
      * @param string $mailbox Name of mailbox to get status from
      * @param string $item    The type of status (see rfc3501 6.3.10)
      *
-     * @return array Key is item
+     * @return int[] The key is the item
      */
-    public function status($mailbox, $item)
+    public function status(string $mailbox, string $item): array
     {
         $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
         $this->writeLine('STATUS "' . $mailbox . '" (' . $item . ')');
         $responce = $this->responce();
 
-        $return = array();
+        $return = [];
 
         preg_match_all(
             '/^\* STATUS "[^"]+" \((MESSAGES|RECENT|UIDNEXT|UIDVALIDITY|UNSEEN) ([0-9]+)\)/mu',
@@ -547,9 +522,9 @@ class Imap
      * @param string $message Full message header and body
      * @param string $flags   Flags seporated by space
      *
-     * @return mixed Either the assinged message UID or true
+     * @return ?int Either the assinged message UID or true
      */
-    public function append($mailbox, $message, $flags = '')
+    public function append(string $mailbox, string $message, string $flags = ''): ?int
     {
         $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
         $command = 'APPEND "' . $mailbox . '" (' . $flags . ') {' . strlen($message);
@@ -569,15 +544,13 @@ class Imap
             return $match[1];
         }
 
-        return true;
+        return null;
     }
 
     /**
      * Run housekeeping on the current mailbox.
-     *
-     * @return null
      */
-    public function check()
+    public function check(): void
     {
         if (!$this->selected) {
             throw new Exception('Open mailbox first');
@@ -589,10 +562,8 @@ class Imap
 
     /**
      * Delete messages flaged with \Deleted and close mailbox.
-     *
-     * @return null
      */
-    public function close()
+    public function close(): void
     {
         if (!$this->selected) {
             throw new Exception('Open mailbox first');
@@ -607,9 +578,9 @@ class Imap
     /**
      * Delete messages flaged with \Deleted.
      *
-     * @return array Message numbers that where deleted
+     * @return int[] Message numbers that where deleted
      */
-    public function expunge()
+    public function expunge(): array
     {
         if (!$this->selected) {
             throw new Exception('Open mailbox first');
@@ -633,9 +604,9 @@ class Imap
      * @param string $criteria Searching criteria (see rfc3501 6.4.4)
      * @param bool   $uid      Weather to use UID
      *
-     * @return mixed Array of matching id's or false
+     * @return int[] Array of matching id's or false
      */
-    public function search($criteria, $uid = false)
+    public function search(string $criteria, bool $uid = false): array
     {
         if (!$this->selected) {
             throw new Exception('Open mailbox first');
@@ -654,7 +625,7 @@ class Imap
             return explode(' ', $match[1]);
         }
 
-        return false;
+        return [];
     }
 
     /**
@@ -664,9 +635,9 @@ class Imap
      * @param string $data   Atom or a parenthesized (see rfc3501 6.4.5)
      * @param bool   $uid    Weather to use UID
      *
-     * @return array Raw from responce()
+     * @return string[] Raw from responce()
      */
-    public function fetch($msgSet, $data, $uid = false)
+    public function fetch(string $msgSet, string $data, bool $uid = false): array
     {
         if (!$this->selected) {
             throw new Exception('Open mailbox first');
@@ -690,10 +661,9 @@ class Imap
      * @param string $flags  Flags seporated by space
      * @param bool   $uid    Weather to use UID
      *
-     * @return array Key is message id with the message flags as a sub array under
-     *               the flags key
+     * @return array[] Key is message id with the message flags as a sub array under the flags key
      */
-    public function store($msgSet, $action, $flags, $uid = false)
+    public function store(string $msgSet, string $action, string $flags, bool $uid = false): array
     {
         if (!$this->selected) {
             throw new Exception('Open mailbox first');
@@ -714,16 +684,14 @@ class Imap
             PREG_SET_ORDER
         );
 
-        $fetchs = array();
+        $fetchs = [];
         foreach ($matches as $fetch) {
-            $flags = array();
+            $flags = [];
             foreach (explode(' ', $fetch[2]) as $flag) {
                 $flags[$flag] = true;
             }
 
-            $fetchs[$fetch[1]] = array(
-                'flags' => $flags,
-            );
+            $fetchs[$fetch[1]] = ['flags' => $flags];
         }
 
         return $fetchs;
@@ -735,10 +703,8 @@ class Imap
      * @param string $msgSet  Message(s) to fetch
      * @param string $mailbox Name of mailbox to copy messages to
      * @param bool   $uid     Weather to use UID
-     *
-     * @return array Raw from responce()
      */
-    public function copy($msgSet, $mailbox, $uid = false)
+    public function copy(string $msgSet, string $mailbox, bool $uid = false): void
     {
         if (!$this->selected) {
             throw new Exception('Open mailbox first');

@@ -3,7 +3,7 @@
     "description": "IMAP over socket",
     "version": "0.1.0",
     "require": {
-        "php": ">=5.4"
+        "php": ">=7.1"
     },
     "autoload": {
         "psr-4": {
