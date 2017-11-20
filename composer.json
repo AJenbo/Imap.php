@@ -1,6 +1,7 @@
 {
     "name": "ajenbo/imap.php",
     "description": "IMAP over socket",
+    "license": "MIT",
     "require": {
         "php": ">=7.1"
     },
