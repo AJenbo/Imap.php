@@ -11,7 +11,14 @@ use AJenbo\Imap\Exception;
  */
 class Imap
 {
-    public $capabilities = [];
+    /** @var (bool[]|bool)[] */
+    public $capabilities = [
+        'LITERAL+' => false,
+        'AUTH' = [
+            'LOGIN' => false,
+            'PLAIN' => false,
+        ],
+    ];
 
     /** @var resource */
     private $socket;
@@ -110,6 +117,32 @@ class Imap
     }
 
     /**
+     * Send a command to the server that prepares the server for a data trasfer.
+     *
+     * This dosn't actually transfer the data
+     *
+     * @param string $command The command to send over the wire
+     * @param string $data    The data that will be uploaded
+     * @param bool   $literal Weather this is a literal write
+     *
+     * @throws Exception
+     *
+     * @return void
+     */
+    private function startTransfer(string $command, string $data, bool $literal = false): void
+    {
+        if ($this->capabilities['LITERAL+']) {
+            $command .= ' {' . strlen($data) . '+}';
+        }
+
+        $this->writeLine($command, $literal);
+
+        if (!$this->capabilities['LITERAL+']) {
+            $this->responce(true);
+        }
+    }
+
+    /**
      * Retrive the full responce message from server.
      *
      * @param bool $literal Weather to expect a ready for literal message
@@ -178,16 +211,15 @@ class Imap
         foreach ($string as $capability) {
             $capability = trim($capability);
             if (false === strpos($capability, '=')) {
-                if (!@$this->capabilities[$capability]) {
-                    $this->capabilities[$capability] = true;
-                }
-            } else {
-                $capability = explode('=', $capability);
-                if (true === @$this->capabilities[$capability[0]]) {
-                    $this->capabilities[$capability[0]] = [];
-                }
-                $this->capabilities[$capability[0]][$capability[1]] = true;
+                $this->capabilities[$capability] = true;
+                continue;
             }
+
+            $capability = explode('=', $capability);
+            if (!is_array($this->capabilities[$capability[0]] ?? null)) {
+                $this->capabilities[$capability[0]] = [];
+            }
+            $this->capabilities[$capability[0]][$capability[1]] = true;
         }
     }
 
@@ -217,22 +249,17 @@ class Imap
      */
     private function authenticatePlain(): bool
     {
-        if (!@$this->capabilities['AUTH']['PLAIN']) {
+        if (empty($this->capabilities['AUTH']['PLAIN'])) {
             return false;
         }
 
         $auth = base64_encode(chr(0) . $this->user . chr(0) . $this->password);
         $command = 'AUTHENTICATE PLAIN';
 
-        if (@$this->capabilities['SASL-IR']) {
+        if (!empty($this->capabilities['SASL-IR'])) {
             $this->writeLine($command . ' ' . $auth);
         } else {
-            if (@$this->capabilities['LITERAL+']) {
-                $this->writeLine($command . ' {' . strlen($auth) . '+}');
-            } else {
-                $this->writeLine($command);
-                $this->responce(true);
-            }
+            $this->startTransfer($command);
             $this->writeLine($auth, true);
         }
 
@@ -257,7 +284,7 @@ class Imap
      */
     private function authenticateLogin(): bool
     {
-        if (!@$this->capabilities['AUTH']['LOGIN']) {
+        if (empty($this->capabilities['AUTH']['LOGIN'])) {
             return false;
         }
 
@@ -265,24 +292,12 @@ class Imap
         $password = base64_encode($this->password);
         $command = 'AUTHENTICATE LOGIN';
 
-        if (@$this->capabilities['SASL-IR']) {
+        if (!empty($this->capabilities['SASL-IR'])) {
             $command = $command . ' ' . $username;
-            if (@$this->capabilities['LITERAL+']) {
-                $this->writeLine($command . ' {' . strlen($password) . '+}');
-            } else {
-                $this->writeLine($command);
-                $this->responce(true);
-            }
+            $this->startTransfer($command, $password);
         } else {
-            if (@$this->capabilities['LITERAL+']) {
-                $this->writeLine($command . ' {' . strlen($username) . '+}');
-                $this->writeLine($username . ' {' . strlen($password) . '+}', true);
-            } else {
-                $this->writeLine($command);
-                $this->responce(true);
-                $this->writeLine($username, true);
-                $this->responce(true);
-            }
+            $this->startTransfer($command, $username);
+            $this->startTransfer($username, $password);
         }
         $this->writeLine($password, true);
 
@@ -573,15 +588,12 @@ class Imap
     public function append(string $mailbox, string $message, string $flags = ''): ?int
     {
         $mailbox = mb_convert_encoding($mailbox, 'UTF7-IMAP', 'UTF-8');
-        $command = 'APPEND "' . $mailbox . '" (' . $flags . ') {' . strlen($message);
-
-        if (@$this->capabilities['LITERAL+']) {
-            $this->writeLine($command . '+}');
-        } else {
-            $this->writeLine($command . '}');
-            $this->responce(true);
+        $command = 'APPEND "' . $mailbox . '" (' . $flags . ')';
+        if (!$this->capabilities['LITERAL+']) {
+            $command .= ' {' . strlen($message) . '}';
         }
 
+        $this->startTransfer($command, $message);
         $this->writeLine($message, true);
         $responce = $this->responce();
 
