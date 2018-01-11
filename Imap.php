@@ -3,22 +3,35 @@
 use AJenbo\Imap\Exception;
 
 /**
- * @license  GPLv2 http://www.gnu.org/licenses/gpl-2.0.html
+ * @license GPLv2 http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * @todo Process all responces from responce
+ * @todo Handle process each line as it is fetched instead of expecting specefic responces
+ * @todo show error for * NO Invalid message sequence number: 1
  */
 class Imap
 {
-    //TODO Process all responces from responce
-    //TODO Handle process each line as it is fetched instead of expecting specefic responces
-    //TODO show error for * NO Invalid message sequence number: 1
-
     public $capabilities = [];
 
+    /** @var resource */
     private $socket;
-    private $host     = '';
-    private $port     = 143;
-    private $user     = '';
+
+    /** @var string */
+    private $host = '';
+
+    /** @var int */
+    private $port = 143;
+
+    /** @var string */
+    private $user = '';
+
+    /** @var string */
     private $password = '';
-    private $tag      = 0;
+
+    /** @var int */
+    private $tag = 0;
+
+    /** @var bool */
     private $selected = false;
 
     /**
@@ -50,6 +63,10 @@ class Imap
 
     /**
      * Open a connection to the server and authenticate.
+     *
+     * @throws Exception
+     *
+     * @return void
      */
     private function connect(): void
     {
@@ -74,6 +91,10 @@ class Imap
      *
      * @param string $command The command to send over the wire
      * @param bool   $literal Weather this is a literal write
+     *
+     * @throws Exception
+     *
+     * @return void
      */
     private function writeLine(string $command, bool $literal = false): void
     {
@@ -92,6 +113,8 @@ class Imap
      * Retrive the full responce message from server.
      *
      * @param bool $literal Weather to expect a ready for literal message
+     *
+     * @throws Exception
      *
      * @return string[] Responce from server devided in to types
      */
@@ -138,6 +161,8 @@ class Imap
      * Populate the capabilites variable with the serveres reported capabilitys.
      *
      * @param string $string String to use instead of fetching from the server
+     *
+     * @return void
      */
     private function capability(string $string = ''): void
     {
@@ -168,6 +193,8 @@ class Imap
 
     /**
      * Use most secure way to login to server.
+     *
+     * @return void
      */
     private function authenticate(): void
     {
@@ -223,11 +250,13 @@ class Imap
     /**
      * The login authentification methode.
      *
+     * @todo Some providers supports this with out saying so, should we always try it?
+     * @todo Some providers failes SASL-IR login with LITERAL+
+     *
      * @return bool True if authenticated
      */
     private function authenticateLogin(): bool
     {
-        //TODO onc.com supports this with out saying so, should we always try it?
         if (!@$this->capabilities['AUTH']['LOGIN']) {
             return false;
         }
@@ -238,7 +267,6 @@ class Imap
 
         if (@$this->capabilities['SASL-IR']) {
             $command = $command . ' ' . $username;
-            //TODO one.com failes with this login methode and LITERAL+
             if (@$this->capabilities['LITERAL+']) {
                 $this->writeLine($command . ' {' . strlen($password) . '+}');
             } else {
@@ -271,6 +299,8 @@ class Imap
 
     /**
      * The most basic authentification methode.
+     *
+     * @return void
      */
     private function login(): void
     {
@@ -283,7 +313,10 @@ class Imap
 
     /**
      * Keep connection alive during a period of inactivity
-     * TODO get posible responce since last check.
+     *
+     * @todo Get posible responce since last check.
+     *
+     * @return void
      */
     public function noop(): void
     {
@@ -367,6 +400,8 @@ class Imap
      * Create a mailbox.
      *
      * @param string $mailbox Name of mailbox to create
+     *
+     * @return void
      */
     public function create(string $mailbox): void
     {
@@ -379,6 +414,10 @@ class Imap
      * Delete mailbox.
      *
      * @param string $mailbox Name of mailbox to delete
+     *
+     * @throws Exception
+     *
+     * @return void
      */
     public function delete(string $mailbox): void
     {
@@ -396,6 +435,10 @@ class Imap
      *
      * @param string $mailbox    Name of mailbox to rename
      * @param string $mailboxNew New name for mailbox
+     *
+     * @throws Exception
+     *
+     * @return void
      */
     public function rename(string $mailbox, string $mailboxNew): void
     {
@@ -413,6 +456,8 @@ class Imap
      * Subscribe to a mailbox.
      *
      * @param string $mailbox Name of mailbox to subscribe to
+     *
+     * @return void
      */
     public function subscribe(string $mailbox): void
     {
@@ -425,6 +470,8 @@ class Imap
      * Unsubscribe from a mailbox.
      *
      * @param string $mailbox Name of mailbox to unsubscribe from
+     *
+     * @return void
      */
     public function unsubscribe(string $mailbox): void
     {
@@ -549,6 +596,10 @@ class Imap
 
     /**
      * Run housekeeping on the current mailbox.
+     *
+     * @throws Exception
+     *
+     * @return void
      */
     public function check(): void
     {
@@ -562,6 +613,10 @@ class Imap
 
     /**
      * Delete messages flaged with \Deleted and close mailbox.
+     *
+     * @throws Exception
+     *
+     * @return void
      */
     public function close(): void
     {
@@ -577,6 +632,8 @@ class Imap
 
     /**
      * Delete messages flaged with \Deleted.
+     *
+     * @throws Exception
      *
      * @return int[] Message numbers that where deleted
      */
@@ -603,6 +660,8 @@ class Imap
      *
      * @param string $criteria Searching criteria (see rfc3501 6.4.4)
      * @param bool   $uid      Weather to use UID
+     *
+     * @throws Exception
      *
      * @return int[] Array of matching id's or false
      */
@@ -635,6 +694,8 @@ class Imap
      * @param string $data   Atom or a parenthesized (see rfc3501 6.4.5)
      * @param bool   $uid    Weather to use UID
      *
+     * @throws Exception
+     *
      * @return string[] Raw from responce()
      */
     public function fetch(string $msgSet, string $data, bool $uid = false): array
@@ -660,6 +721,8 @@ class Imap
      * @param string $action How to preforme the change (see rfc3501 6.4.6)
      * @param string $flags  Flags seporated by space
      * @param bool   $uid    Weather to use UID
+     *
+     * @throws Exception
      *
      * @return array[] Key is message id with the message flags as a sub array under the flags key
      */
@@ -703,6 +766,10 @@ class Imap
      * @param string $msgSet  Message(s) to fetch
      * @param string $mailbox Name of mailbox to copy messages to
      * @param bool   $uid     Weather to use UID
+     *
+     * @throws Exception
+     *
+     * @return void
      */
     public function copy(string $msgSet, string $mailbox, bool $uid = false): void
     {
