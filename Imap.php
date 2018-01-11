@@ -99,7 +99,7 @@ class Imap
     private function writeLine(string $command, bool $literal = false): void
     {
         if (!$literal) {
-            ++$this->tag;
+            $this->tag++;
             $command = $this->tag . ' ' . $command;
         }
 
@@ -289,12 +289,11 @@ class Imap
         try {
             $responce = $this->responce();
             $this->capability(substr($responce['responce'], 11));
-
-            return true;
         } catch (Exception $e) {
+            return false;
         }
 
-        return false;
+        return true;
     }
 
     /**
