@@ -394,7 +394,7 @@ class Imap
             PREG_SET_ORDER
         );
         foreach ($matches as $matche) {
-            $return[mb_strtolower($matche[2])] = (int) $matches[1];
+            $return[mb_strtolower($matche[2])] = (int) $matche[1];
         }
 
         preg_match_all(
@@ -404,7 +404,7 @@ class Imap
             PREG_SET_ORDER
         );
         foreach ($matches as $matche) {
-            $return[mb_strtolower($matche[1])] = (int) $matches[2];
+            $return[mb_strtolower($matche[1])] = (int) $matche[2];
         }
 
         return $return;
@@ -570,7 +570,7 @@ class Imap
             PREG_SET_ORDER
         );
         foreach ($matches as $matche) {
-            $return[mb_strtolower($matche[1])] = (int) $matches[2];
+            $return[mb_strtolower($matche[1])] = (int) $matche[2];
         }
 
         return $return;
