@@ -14,7 +14,7 @@ class Imap
     /** @var (bool[]|bool)[] */
     public $capabilities = [
         'LITERAL+' => false,
-        'AUTH' = [
+        'AUTH' => [
             'LOGIN' => false,
             'PLAIN' => false,
         ],
